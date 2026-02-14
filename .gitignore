@@ -1,0 +1,22 @@
+# Large generated data
+data/
+checkpoints/
+checkpoints_baseline/
+
+# Evaluation artifacts (keep PNGs, skip JSON)
+results/*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Docs
+docs/

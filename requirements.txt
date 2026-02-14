@@ -1,0 +1,15 @@
+# Lines Model — Python Dependencies
+# Install: pip install -r requirements.txt
+#
+# Note: PyTorch nightly is used for MPS (Apple Silicon) support.
+# Install PyTorch separately first:
+#   pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+
+torch>=2.1.0
+torchvision>=0.16.0
+diffusers>=0.25.0
+accelerate>=1.0.0
+tqdm>=4.60.0
+numpy>=1.24.0
+safetensors>=0.4.0
+huggingface-hub>=0.20.0
