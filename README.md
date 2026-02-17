@@ -62,7 +62,7 @@ This is the key insight from **Rectified Flow** [Liu et al., 2023]: if you have 
 ## How It Works
 
 ### Step 1: Create (Noise, Image) pairs from the Teacher
-We run the pre-trained DDPM on 50,000 random noise vectors to get 50,000 paired outputs. Each pair deterministically links a specific noise $N$ to the image $C$ the teacher produces from it.
+We run the pre-trained DDPM on 250,000 random noise vectors to get 250,000 paired outputs. Each pair deterministically links a specific noise $N$ to the image $C$ the teacher produces from it.
 
 ### Step 2: Train along the line
 For any pair $(N, C)$, define a linear interpolation parameterized by $t \in [0, 1]$:
@@ -104,7 +104,7 @@ lines_model/
 
 ## Phase A: Teacher Data Generation (`src/data_gen.py`)
 
-Loads `google/ddpm-cifar10-32` and generates 50,000 deterministic (Noise, Clean) pairs. Uses **DDIM sampling** (100 steps) instead of the full 1000-step DDPM for a ~10× speedup while maintaining quality.
+Loads `google/ddpm-cifar10-32` and generates deterministic (Noise, Clean) pairs. Uses **DDIM sampling** (200 steps) instead of the full 1000-step DDPM for a ~5× speedup while maintaining quality. We generated **250,000 pairs**.
 
 ### Features
 - **DDIM acceleration**: Configurable via `--num_steps` (auto-switches scheduler)
@@ -119,7 +119,7 @@ python src/data_gen.py [--num_samples 250000] [--batch_size 128] [--num_steps 20
 
 ### Output
 ```
-data/teacher_pairs.pt  (~1.2 GB)
+data/teacher_pairs.pt  (~6 GB)
   ├── "noise": Tensor(250000, 3, 32, 32)  float32
   └── "clean": Tensor(250000, 3, 32, 32)  float32
 ```
@@ -295,7 +295,7 @@ We trained the **Naive Baseline on the full 250k dataset**, while restricting th
 | Model | Data Size | MSE (Hold-out) | Visual Quality |
 | :--- | :---: | :---: | :--- |
 | **Naive Baseline** | **250,000 (5x)** | **15.74** | Blurry / Average Mode |
-| **Lines Model** | 50,000 (1x) | 47.97 | **Sharp / High Fidelity** |
+| **Lines Model** | 50,000 (1x) | 47.97 | **Recognizable structure, softer than Teacher** |
 
 ![Baseline 250k Comparison](results/baseline_250k/lines_vs_baseline.png)
 
