@@ -1,10 +1,9 @@
 # Large generated data
 data/
-checkpoints/
-checkpoints_baseline/
+checkpoints*/
 
 # Evaluation artifacts (keep PNGs, skip JSON)
-results/*.json
+results/**/*.json
 
 # Python
 __pycache__/

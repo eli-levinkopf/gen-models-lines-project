@@ -43,12 +43,16 @@ def get_device() -> torch.device:
     return torch.device("cpu")
 
 
-def load_teacher_pairs(data_path: Path) -> TensorDataset:
+def load_teacher_pairs(data_path: Path, num_pairs: int | None = None) -> TensorDataset:
     """Load the cached (Noise, Clean) pairs into a TensorDataset."""
     print(f"Loading teacher pairs from {data_path} ...")
     data = torch.load(data_path, weights_only=True)
     noise = data["noise"]   # (N, 3, 32, 32)
     clean = data["clean"]   # (N, 3, 32, 32)
+    if num_pairs is not None and num_pairs < noise.shape[0]:
+        noise = noise[:num_pairs]
+        clean = clean[:num_pairs]
+        print(f"  Using {num_pairs} of {data['noise'].shape[0]} pairs (subset).")
     print(f"  Loaded {noise.shape[0]} pairs.  "
           f"noise {noise.shape}, clean {clean.shape}\n")
     return TensorDataset(noise, clean)
@@ -67,6 +71,7 @@ def train(
     save_every: int = 10,
     log_every: int = 50,
     baseline: bool = False,
+    num_pairs: int | None = None,
 ) -> None:
     data_path = Path(data_path)
     save_dir = Path(save_dir)
@@ -78,7 +83,7 @@ def train(
     print(f"Training mode: {mode_name}\n")
 
     # ── Data ──
-    dataset = load_teacher_pairs(data_path)
+    dataset = load_teacher_pairs(data_path, num_pairs=num_pairs)
     loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -210,6 +215,8 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", action="store_true",
                         help="Train naive baseline (always t=0, no interpolation). "
                              "Saves to checkpoints_baseline/ by default.")
+    parser.add_argument("--num_pairs", type=int, default=None,
+                        help="Use only the first N pairs (for data-efficiency experiments).")
 
     args = parser.parse_args()
 
@@ -226,4 +233,5 @@ if __name__ == "__main__":
         save_dir=save_dir,
         save_every=args.save_every,
         baseline=args.baseline,
+        num_pairs=args.num_pairs,
     )

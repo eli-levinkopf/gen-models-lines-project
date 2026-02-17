@@ -27,17 +27,17 @@ pip install -r requirements.txt
 ```bash
 conda activate gen_models
 
-# 1. Generate teacher data (~5.5h for 50K pairs)
-python data_gen.py
+# 1. Generate teacher data
+python src/data_gen.py
 
-# 2. Train Lines Model student (~1.5h for 50 epochs)
-python train.py
+# 2. Train Lines Model student
+python src/train.py
 
 # 3. Train naive baseline for comparison
-python train.py --baseline
+python src/train.py --baseline
 
 # 4. Evaluate (with baseline comparison)
-python evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
+python src/evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
 ```
 
 ## The Problem
@@ -89,10 +89,11 @@ During training, we want the student to handle inputs at every noise level — h
 
 ```
 lines_model/
-├── data_gen.py            # Phase A: Generate (N, C) pairs from teacher DDPM
-├── model.py               # Phase B: Student Conditional U-Net (9.0M params)
-├── train.py               # Phase C: Lines Model training loop (+ --baseline mode)
-├── evaluate.py            # Phase D: Benchmarks, visualizations, metrics
+├── src/
+│   ├── data_gen.py        # Phase A: Generate (N, C) pairs from teacher DDPM
+│   ├── model.py           # Phase B: Student Conditional U-Net (9.0M params)
+│   ├── train.py           # Phase C: Lines Model training loop (+ --baseline mode)
+│   └── evaluate.py        # Phase D: Benchmarks, visualizations, metrics
 ├── data/                  # Generated teacher pairs (~1.2 GB)
 ├── checkpoints/           # Lines Model training checkpoints
 ├── checkpoints_baseline/  # Baseline (naive distillation) checkpoints
@@ -101,7 +102,7 @@ lines_model/
 
 ---
 
-## Phase A: Teacher Data Generation (`data_gen.py`)
+## Phase A: Teacher Data Generation (`src/data_gen.py`)
 
 Loads `google/ddpm-cifar10-32` and generates 50,000 deterministic (Noise, Clean) pairs. Uses **DDIM sampling** (100 steps) instead of the full 1000-step DDPM for a ~10× speedup while maintaining quality.
 
@@ -113,27 +114,19 @@ Loads `google/ddpm-cifar10-32` and generates 50,000 deterministic (Noise, Clean)
 
 ### Usage
 ```bash
-python data_gen.py [--num_samples 50000] [--batch_size 64] [--num_steps 100] [--data_dir data]
+python src/data_gen.py [--num_samples 250000] [--batch_size 128] [--num_steps 200] [--data_dir data]
 ```
-
-### Performance (M4 Pro, 24GB, MPS)
-
-| Config | Speed | 50K ETA |
-|--------|-------|---------|
-| DDPM 1000 steps, batch=128 | — | OOM |
-| **DDIM 100 steps, batch=64** | **~2.5 img/s** | **~5.5h** |
-| DDIM 50 steps, batch=64 | ~5 img/s | ~2.8h |
 
 ### Output
 ```
 data/teacher_pairs.pt  (~1.2 GB)
-  ├── "noise": Tensor(50000, 3, 32, 32)  float32
-  └── "clean": Tensor(50000, 3, 32, 32)  float32
+  ├── "noise": Tensor(250000, 3, 32, 32)  float32
+  └── "clean": Tensor(250000, 3, 32, 32)  float32
 ```
 
 ---
 
-## Phase B: Student Architecture (`model.py`)
+## Phase B: Student Architecture (`src/model.py`)
 
 Lightweight Conditional U-Net — **4× smaller** than the teacher via "Model Coarsening":
 
@@ -170,7 +163,7 @@ Input (B, 3, 32, 32) + t ∈ [0, 1]
 
 ---
 
-## Phase C: Training (`train.py`)
+## Phase C: Training (`src/train.py`)
 
 ### Lines Model Training Step
 ```python
@@ -194,10 +187,10 @@ loss = MSE(pred, C)                             # Reconstruction loss
 ### Usage
 ```bash
 # Lines Model training (default)
-python train.py [--epochs 50] [--batch_size 256] [--lr 1e-4] [--data_path data/teacher_pairs.pt]
+python src/train.py [--epochs 50] [--batch_size 256] [--lr 1e-4] [--data_path data/teacher_pairs.pt]
 
 # Naive baseline (always t=0, no interpolation)
-python train.py --baseline [--epochs 50] [--batch_size 256]
+python src/train.py --baseline [--epochs 50] [--batch_size 256]
 ```
 
 ---
@@ -221,24 +214,24 @@ The Lines interpolation gives the student a **curriculum** — sometimes it sees
 
 ### Usage
 ```bash
-# 1. Train both (Lines Model is already trained, baseline needs ~1.5h)
-python train.py --baseline
+# 1. Train baseline
+python src/train.py --baseline
 
 # 2. Evaluate with comparison
-python evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
+python src/evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
 ```
 
-This produces [results/lines_vs_baseline.png](results/lines_vs_baseline.png) (3-row grid: Teacher | Lines | Baseline) and comparative MSE metrics in `eval_summary.json`.
+This produces a 3-row grid (Teacher | Lines | Baseline) and comparative MSE metrics in `eval_summary.json`.
 
 ---
 
-## Phase D: Evaluation (`evaluate.py`)
+## Phase D: Evaluation (`src/evaluate.py`)
 
 Generates all evidence for the project report:
 
 | # | Evaluation | Output |
 |---|---|---|
-| 1 | **Speedup benchmark** — Teacher (100 DDIM steps) vs Student (1 step) | `eval_summary.json` |
+| 1 | **Speedup benchmark** — Teacher (200 DDIM steps) vs Student (1 step) | `eval_summary.json` |
 | 2 | **Comparison grid** — Same noise, Teacher vs Student side-by-side | `comparison_grid.png` |
 | 3 | **Trajectory validation** — Student at t=0, 0.2, 0.5, 0.8, 1.0 | `trajectory.png` |
 | 4 | **MSE metric** — Quantitative error on 5K held-out pairs | `eval_summary.json` |
@@ -248,10 +241,10 @@ Generates all evidence for the project report:
 ### Usage
 ```bash
 # Basic evaluation (Lines Model only)
-python evaluate.py [--checkpoint checkpoints/student_final.pt] [--num_steps 100]
+python src/evaluate.py [--checkpoint checkpoints/student_final.pt] [--num_steps 200]
 
 # With baseline comparison
-python evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
+python src/evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
 ```
 
 ---
@@ -259,22 +252,22 @@ python evaluate.py --baseline_checkpoint checkpoints_baseline/student_final.pt
 ## Results
 
 ### 1. Speed & Efficiency
-The primary goal of this project was to reduce the sampling cost. By distilling the 100-step Teacher into a 1-step Student, we achieved a dramatic speedup.
+The primary goal of this project was to reduce the sampling cost. By distilling the 200-step Teacher into a 1-step Student, we achieved a dramatic speedup.
 
 | Model | Steps (NFE) | Inference Time (Batch 16) | Speedup |
 | :--- | :---: | :---: | :---: |
-| **Teacher (DDIM)** | 100 | 15.60s | 1x |
-| **Student (Lines)** | **1** | **0.10s** | **~156x** |
+| **Teacher (DDIM)** | 200 | 13.48s | 1x |
+| **Student (Lines)** | **1** | **0.11s** | **~121x** |
 
-*Measurements taken on M4 Pro (MPS).*
+*Measurements taken on NVIDIA L40S GPU.*
 
 ### 2. Qualitative Quality: Teacher vs. Student
 The Student model successfully learned to mimic the Teacher's output with high semantic fidelity.
 
-![Teacher vs Student](results/comparison_grid.png)
+![Teacher vs Student](results/lines_50k/comparison_grid_lines_50k.png)
 
 > **How to read this figure:** Each column is the same noise vector fed to both models.
-> - **Row 1 — "Teacher (100 DDIM steps)":** The reference images produced by the full 100-step DDIM denoising process.
+> - **Row 1 — "Teacher (200 DDIM steps)":** The reference images produced by the full 200-step DDIM denoising process.
 > - **Row 2 — "Student (1 step)":** The Lines Model output from a single forward pass on the same noise.
 
 **Observations:**
@@ -284,7 +277,7 @@ The Student model successfully learned to mimic the Teacher's output with high s
 ### 3. Validating the "Lines" Trajectory
 To prove the model didn't just memorize pairs but actually learned the **linear trajectory** concept, we visualized the student's input and prediction at various points along the line $t \in [0, 1]$.
 
-![Trajectory](results/trajectory.png)
+![Trajectory](results/lines_50k/trajectory_lines_50k.png)
 
 > **How to read this figure:** There are 4 samples, each shown as a **pair of rows**. Columns correspond to $t = 0.0, 0.2, 0.5, 0.8, 1.0$ (left to right), plus Ground Truth (rightmost).
 > - **Odd rows ("#N Input Xt"):** The actual input $X_t = t \cdot C + (1-t) \cdot N$. At $t=0$ this is pure noise; at $t=1$ it's the clean image. This visually proves the interpolation formula.
@@ -293,34 +286,35 @@ To prove the model didn't just memorize pairs but actually learned the **linear 
 
 **Key Insight:** Even when fed pure noise ($t=0$) or a highly corrupted image ($t=0.2$), the model predicts the **same consistent Ground Truth**. This proves the student learned to "see through" the noise along the specific linear path defined during training.
 
-### 4. Quantitative Analysis: Lines Model vs. Naive Baseline
+### 4. Lines Model vs. Naive Baseline — Data Efficiency (50k vs 250k)
 
-To isolate the benefit of the "Lines" training objective, we compared it against a Naive Distillation baseline (trained to map $N \to C$ directly without interpolation).
+The project guidelines suggested comparing the Lines Model against a Naive Baseline trained on **$5\times$ more data**. To test this, we generated a massive dataset of **250,000 pairs** (DDIM 200 steps).
 
-| Metric | Lines Model (Ours) | Naive Baseline |
-| :--- | :---: | :---: |
-| **Visual Quality** | **Sharp, distinct geometry** | Blurry, amorphous blobs |
-| **Trajectory** | **Consistent across $t$** | Undefined for $t>0$ |
-| Hold-out MSE / sample | 32.22 | **17.86** |
+We trained the **Naive Baseline on the full 250k dataset**, while restricting the **Lines Model to a 50k subset** of the same data.
 
-![Baseline Comparison](results/lines_vs_baseline.png)
+| Model | Data Size | MSE (Hold-out) | Visual Quality |
+| :--- | :---: | :---: | :--- |
+| **Naive Baseline** | **250,000 (5x)** | **15.74** | Blurry / Average Mode |
+| **Lines Model** | 50,000 (1x) | 47.97 | **Sharp / High Fidelity** |
+
+![Baseline 250k Comparison](results/baseline_250k/lines_vs_baseline.png)
 
 > **How to read this figure:** Each column is the same noise vector fed to all three models.
-> - **Row 1 — "Teacher (100 DDIM steps)":** The reference output from the full denoising process.
-> - **Row 2 — "Lines Student (1 step)":** Our model trained with random $t$ interpolation.
-> - **Row 3 — "Baseline (1 step)":** Naive distillation, trained only with $t=0$ (no interpolation).
+> - **Row 1 — "Teacher (200 DDIM steps)":** The reference output from the full denoising process.
+> - **Row 2 — "Lines Student (1 step)":** Our model trained on 50k pairs with random $t$ interpolation.
+> - **Row 3 — "Baseline (1 step)":** Naive distillation trained on 250k pairs, with $t=0$ only (no interpolation).
 >
-> *Notice how the Lines model (Row 2) recovers geometric structure (shapes, edges), while the Baseline (Row 3) collapses to a mean color.*
+> *Notice how the Lines model (Row 2) recovers geometric structure (shapes, edges), while the Baseline (Row 3) collapses to a mean color — despite having 5× more training data.*
 
 **Discussion: The "MSE Trap"**
 
 An interesting phenomenon appears in the metrics: the Naive Baseline achieves a **lower MSE**, yet produces **visually inferior results** (blurry blobs). This confirms a well-known property of regression-based distillation:
 
-1. **The Baseline Failure:** Without the guide-rail of the intermediate $t$ values, the Baseline cannot solve the complex $N \to C$ mapping. It minimizes loss by converging to the **conditional mean** of the data distribution — producing "muddy" images that lack high-frequency detail but have low statistical error. This is why MSE is a notoriously poor proxy for perceptual image quality.
+1. **The Baseline Failure:** Without the guide-rail of the intermediate $t$ values, the Baseline cannot solve the complex $N \to C$ mapping. It minimizes loss by converging to the **conditional mean** of the data distribution — producing "muddy" images that lack high-frequency detail but have low statistical error. This is why MSE is a notoriously poor proxy for perceptual image quality. Crucially, **adding 5× more data does not fix this** — the failure is structural, not data-limited.
 
-2. **The Lines Model Success:** By training on the full trajectory $t \in [0,1]$, the Lines model is forced to commit to a specific "flow" rather than averaging all possibilities. While this occasionally results in higher pixel-level MSE (e.g., if generated structure is slightly misaligned with the target), the **perceptual quality** and structural coherence are significantly higher.
+2. **The Lines Model Success:** By training on the full trajectory $t \in [0,1]$, the Lines model is forced to commit to a specific "flow" rather than averaging all possibilities. While this results in higher pixel-level MSE (generated structure may be slightly misaligned with the target), the **perceptual quality** and structural coherence are significantly higher.
 
-**Conclusion:** The Lines objective successfully prevents "mode collapse to the mean," enabling the generation of distinct semantic objects (cars, planes, animals) in a single step — something the naive approach fails to achieve.
+**Conclusion:** The Lines objective successfully prevents "mode collapse to the mean," enabling the generation of distinct semantic objects (cars, planes, animals) in a single step — something the naive approach fails to achieve even with 250,000 training examples. The Lines Model achieves superior geometric generation with only 20% of the data.
 
 ---
 
