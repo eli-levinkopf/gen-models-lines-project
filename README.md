@@ -259,7 +259,6 @@ The primary goal of this project was to reduce the sampling cost. By distilling 
 | **Teacher (DDIM)** | 200 | 13.48s | 1x |
 | **Student (Lines)** | **1** | **0.11s** | **~121x** |
 
-*Measurements taken on NVIDIA L40S GPU.*
 
 ### 2. Qualitative Quality: Teacher vs. Student
 The Student model successfully learned to mimic the Teacher's output with high semantic fidelity.
